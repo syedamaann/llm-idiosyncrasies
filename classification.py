@@ -130,7 +130,7 @@ def load_model(args):
         model = LLM2Vec(model, tokenizer, pooling_mode="mean", max_length=512)
         
         hidden_size = list(model.modules())[-1].weight.shape[0]
-        model.head = torch.nn.Linear(hidden_size, len(args.response_paths), dtype=torch.bfloat16)
+        model.head = torch.nn.Linear(hidden_size, args.num_labels, dtype=torch.bfloat16)
         
         old_forward = model.forward
         # hacky way to turn LLM2Vec into a sequence classification model compatible with the HF Trainer
@@ -143,7 +143,7 @@ def load_model(args):
         # use the sequence classification model from huggingface
         model = AutoModelForSequenceClassification.from_pretrained(
             classifier_to_hf_name[args.classifier],
-            num_labels=len(args.response_paths),
+            num_labels=args.num_labels,
             torch_dtype=torch.bfloat16,
             device_map="cuda",
             trust_remote_code=True
@@ -181,6 +181,15 @@ def classification(args):
     else:
         data_collator = SequenceClassificationCollator(tokenizer)
     
+    if len(args.response_paths) != args.num_labels:
+        if args.eval_only:
+            print("Warning: the number of response paths is not equal to the number of labels during training. This is ok if you are evaluating on your own dataset.")
+        else:
+            if args.num_labels is None:
+                args.num_labels = len(args.response_paths)
+            else:
+                raise ValueError("the number of response paths must be equal to the number of labels during training")
+            
     # compute loss
     class SequenceClassificationTrainer(Trainer):
         def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
@@ -188,11 +197,12 @@ def classification(args):
             outputs = model.forward(**inputs)
             logits = outputs.get("logits")
             loss_fct = torch.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, len(args.response_paths)), labels.view(-1))
+            loss = loss_fct(logits.view(-1, args.num_labels), labels.view(-1))
             return (loss, outputs) if return_outputs else loss
 
         def save_model(self, output_dir, _internal_call=False):
             super().save_model(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
             if args.classifier == "llm2vec":
                 torch.save(self.model.head.state_dict(), os.path.join(output_dir, "head.pt"))
         
@@ -232,7 +242,7 @@ def classification(args):
         eval_result = trainer.evaluate(ignore_keys=["past_key_values", "encoder_last_hidden_state"] if args.classifier == "t5" else None)
         print(eval_result)
         return
-        
+    
     # training arguments
     training_args = TrainingArguments(
         output_dir = args.output_dir,
@@ -283,6 +293,7 @@ if __name__ == "__main__":
     parser.add_argument('--classifier', type=str, default="llm2vec", 
                         choices=["llm2vec", "bert", "t5", "gpt2"],
                         help='the text embedding model to perform sequence classification')
+    parser.add_argument('--num_labels', type=int, default=None, help="the number of labels")
     
     # training hyperparameters
     parser.add_argument("--epochs", type=int, default=3, help="the number of epochs")

@@ -10,7 +10,7 @@ conda activate gen_resp
 pip install vllm==0.6.3.post1 datasets==3.2.0 openai anthropic google-generativeai
 ```
 
-## Dependency Setup for Classification
+## Dependency Setup for Evaluation and Classification
 
 ```
 conda create -n classification python=3.9 -y
