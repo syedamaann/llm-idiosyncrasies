@@ -26,18 +26,37 @@ pip install llm2vec==0.2.3
 **Error:**
 ```
 CUDA out of memory
+OutOfMemoryError: CUDA out of memory. Tried to allocate 224.00 MiB...
 ```
 
 **Solutions:**
 
-**For Google Colab:**
-- Make sure you selected **T4 GPU** (not CPU)
-- Runtime → Change runtime type → Hardware accelerator → GPU
-- Restart runtime and try again
+**For Google Colab (T4 GPU - 15GB):**
+
+The T4 GPU is barely enough. Try these steps in order:
+
+1. **Restart Runtime & Clear All:**
+   - Runtime → Restart runtime
+   - Edit → Clear all outputs
+   - Run cells again from the beginning
+
+2. **Use Colab Pro (if available):**
+   - Colab Pro gives access to better GPUs (A100 with 40GB)
+   - More reliable for this project
+
+3. **Try Kaggle instead:**
+   - Kaggle offers T4 x2 (dual GPU) for free
+   - See CLOUD_OPTIONS.md for setup
+
+4. **Use a paid cloud service:**
+   - RunPod: ~$0.30/hour with RTX 3090
+   - Vast.ai: ~$0.20/hour
+   - See CLOUD_OPTIONS.md for details
 
 **For local machine:**
 - You need at least 16GB GPU memory
-- Try using a cloud service instead (see CLOUD_OPTIONS.md)
+- This won't work on Mac GPU (even M1/M2/M3)
+- Try cloud services instead
 
 ---
 
