@@ -1,19 +1,24 @@
 # Installation
 
-Please use two separate environments for response generation and classification. It is possible to merge them into a single environment, but it takes a lot of time to resolve the dependencies.
+## Dependencies for Chat API Classification
 
-## Dependency Setup for Response Generation
-
-```
-conda create -n gen_resp python=3.9 -y
-conda activate gen_resp
-pip install vllm==0.6.3.post1 datasets==3.2.0 openai anthropic google-generativeai
-```
-
-## Dependency Setup for Evaluation and Classification
-
-```
+```bash
 conda create -n classification python=3.9 -y
 conda activate classification
-pip install llm2vec==0.2.3 tensorboard
+pip install llm2vec==0.2.3 tensorboard huggingface-hub
 ```
+
+## Download the Classifier
+
+```bash
+bash download_classifier.sh
+```
+
+This will download the pre-trained chat API classifier (~16GB) to `models/classifier_chat`.
+
+## System Requirements
+
+- Python 3.9
+- CUDA-capable GPU with 16GB+ VRAM (recommended)
+- Alternatively, CPU (will be very slow)
+- ~16GB disk space for the model
