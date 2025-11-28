@@ -7,14 +7,24 @@ Your Mac doesn't meet the requirements? No problem! Here are your options:
 **Best for:** Quick testing, no setup required
 
 ### Steps:
-1. Open the notebook: [`colab_classifier.ipynb`](./colab_classifier.ipynb)
-2. Upload to Google Colab:
+1. **Request Llama 3 access** (one-time, instant approval):
+   - Go to: https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct
+   - Click "Agree and access repository"
+2. **Create HuggingFace token**:
+   - Go to: https://huggingface.co/settings/tokens
+   - Click "New token" → Name it → Select "Read" → Generate
+   - Copy the token (starts with `hf_...`)
+3. **Upload notebook to Colab**:
    - Go to [colab.research.google.com](https://colab.research.google.com)
    - File → Upload notebook → Choose `colab_classifier.ipynb`
-3. **Enable GPU:**
+4. **Enable GPU:**
    - Runtime → Change runtime type → Hardware accelerator → **T4 GPU**
-4. Run all cells in order
-5. Paste your text and get predictions!
+5. **Add token to Colab Secrets:**
+   - Click 🔑 icon on left sidebar
+   - Add secret: Name=`HF_TOKEN`, Value=(paste your token)
+   - Enable notebook access toggle
+6. Run all cells in order
+7. Paste your text and get predictions!
 
 **Pros:**
 - ✅ Completely free
