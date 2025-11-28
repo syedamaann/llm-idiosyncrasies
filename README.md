@@ -6,14 +6,21 @@ Detect which AI model (ChatGPT, Claude, Grok, Gemini, or DeepSeek) generated tex
 
 ## Quick Start
 
-### Option 1: Google Colab (Recommended)
+### Option 1: Google Colab
 
 1. Upload `classifier.ipynb` to [Google Colab](https://colab.research.google.com)
 2. Enable GPU: Runtime → Change runtime type → T4 GPU
 3. Add HuggingFace token to Colab Secrets (see notebook for details)
 4. Run all cells
 
-### Option 2: Local Setup
+### Option 2: Kaggle Notebooks
+
+1. Upload `classifier.ipynb` to [Kaggle Notebooks](https://kaggle.com)
+2. Enable GPU: Settings → Accelerator → GPU P100
+3. Add HuggingFace token to Kaggle Secrets (see notebook for details)
+4. Run all cells
+
+### Option 3: Local Setup
 
 **Requirements:**
 - Python 3.9+
