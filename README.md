@@ -1,4 +1,4 @@
-# LLM Detector
+# Which LLM Wrote This? ChatGPT, Claude, Gemini, or Grok?
 
 Detect which AI model (ChatGPT, Claude, Grok, Gemini, or DeepSeek) generated text using a neural network classifier.
 
