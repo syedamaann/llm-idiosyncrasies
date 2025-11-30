@@ -4,6 +4,8 @@ Detect which AI model (ChatGPT, Claude, Grok, Gemini, or DeepSeek) generated tex
 
 **97.1% accuracy** on test data | Based on [this research paper](https://arxiv.org/abs/2502.12150)
 
+https://github.com/user-attachments/assets/demo-video.mp4
+
 ## Quick Start
 
 ### Option 1: Google Colab
