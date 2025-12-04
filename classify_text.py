@@ -176,13 +176,24 @@ def predict_text(model, text, label_names):
     # Tokenize
     inputs = model.tokenize([prepared_text])
 
-    # Move inputs to the same device as model
-    device = next(model.parameters()).device
-    inputs = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
+    # Dynamic device detection - find where model's first layer actually lives
+    try:
+        target_device = next(model.parameters()).device
+    except:
+        target_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    inputs = {k: v.to(target_device) if isinstance(v, torch.Tensor) else v for k, v in inputs.items()}
 
     # Get embeddings and predict
     with torch.no_grad():
-        embeddings = model.forward(inputs).to(torch.bfloat16)
+        embeddings = model.forward(inputs)
+
+        # Move embeddings to same device as classification head
+        if hasattr(model, 'head'):
+            head_device = next(model.head.parameters()).device
+            embeddings = embeddings.to(head_device)
+
+        embeddings = embeddings.to(torch.bfloat16)
         logits = model.head(embeddings)
         probabilities = torch.nn.functional.softmax(logits, dim=-1)
 
@@ -190,8 +201,8 @@ def predict_text(model, text, label_names):
     pred_label = torch.argmax(probabilities, dim=-1).item()
     pred_prob = probabilities[0, pred_label].item()
 
-    # Get all probabilities
-    all_probs = probabilities[0].cpu().numpy()
+    # Get all probabilities (convert to float32 before numpy - bfloat16 not supported)
+    all_probs = probabilities[0].float().cpu().numpy()
 
     return pred_label, pred_prob, all_probs
 
