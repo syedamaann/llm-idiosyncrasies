@@ -4,68 +4,167 @@ import os
 import tempfile
 import torch
 import numpy as np
+import gc
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 from peft import PeftModel
 from llm2vec import LLM2Vec
 
 
-def load_classifier(checkpoint_path, num_labels=5):
-    """Load the pre-trained LLM2Vec classifier."""
-    print("Loading classifier...")
+def load_classifier(checkpoint_path, mode="LOW_BANDWIDTH", num_labels=5):
+    """
+    Robust classifier loader with Dual-Pathway support.
+    mode="FAST_FUSED": Loads pre-merged weights (Fast startup, High disk usage)
+    mode="LOW_BANDWIDTH": Merges adapters at runtime (Slow startup, Low disk usage)
+    """
+    print(f"Loading classifier in {mode} mode...")
+    torch.cuda.empty_cache()
+    gc.collect()
 
-    # Load the base LLM2Vec model
-    base_model_name = "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp"
+    # Common Resource: The Base Model ID (Used for Config/Tokenizer in both modes)
+    base_model_id = "McGill-NLP/LLM2Vec-Meta-Llama-3-8B-Instruct-mntp"
+    tokenizer = AutoTokenizer.from_pretrained(base_model_id, trust_remote_code=True)
 
-    config = AutoConfig.from_pretrained(
-        base_model_name,
-        trust_remote_code=True,
-    )
-    model = AutoModel.from_pretrained(
-        base_model_name,
-        config=config,
-        torch_dtype=torch.bfloat16,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-        trust_remote_code=True,
-    )
+    # Memory configuration
+    max_memory = {0: "14GiB", "cpu": "30GiB"}
 
-    # Load PEFT adaptors
-    model = PeftModel.from_pretrained(
-        model,
-        base_model_name,
-        torch_dtype=torch.bfloat16,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-        trust_remote_code=True,
-    )
-    model = model.merge_and_unload()
+    # =========================================================
+    # PATHWAY A: FAST / FUSED (Hybrid Load with Safety)
+    # =========================================================
+    if mode == "FAST_FUSED":
+        print("⚡ Route: Loading pre-merged weights...")
 
-    model = PeftModel.from_pretrained(
-        model,
-        f"{base_model_name}-supervised",
-        is_trainable=True,
-        torch_dtype=torch.bfloat16,
-        device_map="cuda" if torch.cuda.is_available() else "cpu",
-        trust_remote_code=True,
-    )
+        # 1. Load Configuration from Base (Critical Fix for missing config.json)
+        config = AutoConfig.from_pretrained(base_model_id, trust_remote_code=True)
 
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(base_model_name, trust_remote_code=True)
+        # 2. Load Weights from Local Folder with SAFE device map
+        # NOTE: Using single GPU strategy to avoid residual connection device mismatch
+        device_map = {"": 0}  # Force everything to GPU 0
 
-    # Create LLM2Vec model
+        model = AutoModel.from_pretrained(
+            checkpoint_path,
+            config=config,
+            torch_dtype=torch.bfloat16,
+            device_map=device_map,
+            max_memory=max_memory,
+            offload_folder="./offload",
+            trust_remote_code=True,
+            low_cpu_mem_usage=True,
+        )
+
+        print("✓ Pre-merged model loaded")
+        torch.cuda.empty_cache()
+        gc.collect()
+
+    # =========================================================
+    # PATHWAY B: LOW BANDWIDTH / ADAPTER (Original Logic)
+    # =========================================================
+    else:
+        print("🔧 Route: Building from adapters...")
+
+        # 1. Load Base Model
+        print("Loading base model...")
+        config = AutoConfig.from_pretrained(base_model_id, trust_remote_code=True)
+
+        device_map = {"": 0}
+        model = AutoModel.from_pretrained(
+            base_model_id,
+            config=config,
+            torch_dtype=torch.bfloat16,
+            device_map=device_map,
+            max_memory=max_memory,
+            offload_folder="./offload",
+            trust_remote_code=True,
+            low_cpu_mem_usage=True,
+        )
+
+        print("✓ Base model loaded")
+        torch.cuda.empty_cache()
+
+        # 2. Load and merge first adapter
+        print("Loading first adapter...")
+        model = PeftModel.from_pretrained(
+            model,
+            base_model_id,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+        )
+
+        # Move to CPU for merging to avoid OOM
+        print("✓ Moving to CPU for merging...")
+        model = model.cpu()
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        print("✓ Merging first adapter...")
+        model = model.merge_and_unload()
+
+        # Move back to GPU with CPU offload
+        print("✓ Moving merged model back to GPU...")
+        model = model.to(torch.bfloat16)
+
+        # Re-dispatch to GPU 0 (with CPU offload for layers that don't fit)
+        from accelerate import dispatch_model, infer_auto_device_map
+        device_map_merged = infer_auto_device_map(
+            model,
+            max_memory=max_memory,
+            no_split_module_classes=["LlamaDecoderLayer"]  # Keep decoder layers intact
+        )
+        model = dispatch_model(model, device_map=device_map_merged, offload_dir="./offload")
+
+        torch.cuda.empty_cache()
+        gc.collect()
+
+        # 3. Load supervised adapter
+        print("✓ Loading supervised adapter...")
+        model = PeftModel.from_pretrained(
+            model,
+            f"{base_model_id}-supervised",
+            is_trainable=True,
+            torch_dtype=torch.bfloat16,
+            trust_remote_code=True,
+        )
+
+        torch.cuda.empty_cache()
+
+    # =========================================================
+    # COMMON: LLM2Vec & Classification Head
+    # =========================================================
     model = LLM2Vec(model, tokenizer, pooling_mode="mean", max_length=512)
 
-    # Add classification head
+    # Initialize Head
     hidden_size = list(model.modules())[-1].weight.shape[0]
     model.head = torch.nn.Linear(hidden_size, num_labels, dtype=torch.bfloat16)
 
-    # Load the trained classification head
-    head_path = os.path.join(checkpoint_path, "head.pt")
-    if os.path.exists(head_path):
-        model.head.load_state_dict(torch.load(head_path, map_location="cuda" if torch.cuda.is_available() else "cpu"))
-        print(f"Loaded classification head from {head_path}")
-    else:
-        raise FileNotFoundError(f"Classification head not found at {head_path}")
+    # Load Head Weights with dynamic device detection
+    head_file = os.path.join(checkpoint_path, "head.pt")
+    if not os.path.exists(head_file):
+        raise FileNotFoundError(f"Classification head not found at {head_file}")
+
+    try:
+        target_device = next(model.parameters()).device
+    except:
+        target_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    model.head.load_state_dict(torch.load(head_file, map_location=target_device))
+    model.head = model.head.to(target_device)
+    print(f"✓ Loaded classification head from {head_file}")
 
     model.eval()
+
+    # Final cleanup
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    # Show memory usage
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            allocated = torch.cuda.memory_allocated(i) / 1024**3
+            reserved = torch.cuda.memory_reserved(i) / 1024**3
+            if i == 0 or allocated > 0:
+                print(f"✓ GPU {i}: {allocated:.2f}GB allocated, {reserved:.2f}GB reserved")
+    else:
+        print("✓ Classifier loaded on CPU")
+
     return model
 
 
