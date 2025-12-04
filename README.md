@@ -26,41 +26,40 @@ Detect which AI model (ChatGPT, Claude, Grok, Gemini, or DeepSeek) generated tex
 
 **Requirements:**
 - Python 3.9+
-- CUDA GPU with 16GB+ VRAM
-- ~16GB disk space
+- CUDA GPU with 14GB+ VRAM
+- ~16GB disk space (LOW_BANDWIDTH) or ~24GB (FAST_FUSED)
 
-**Install:**
+**Quick Start:**
 ```bash
+# 1. Install dependencies
 conda create -n llm-detector python=3.9 -y
 conda activate llm-detector
-pip install llm2vec==0.2.3 tensorboard huggingface-hub
+pip install transformers==4.46.3 peft==0.13.2 huggingface-hub accelerate llm2vec==0.2.3
+
+# 2. Authenticate with Hugging Face
+huggingface-cli login
+
+# 3. Download classifier (choose one)
+# Option A: Minimal download (40KB)
+huggingface-cli download Yida/classifier_chat head.pt --local-dir ./classifier_chat
+
+# Option B: Pre-merged weights for faster startup (15.5GB)
+huggingface-cli download Yida/classifier_chat --include "*.safetensors" --include "head.pt" --local-dir ./classifier_chat
+
+# 4. Run classifier
+python classify_text.py --checkpoint ./classifier_chat
 ```
 
-**Download classifier:**
+**📖 For detailed instructions, troubleshooting, and examples, see [USAGE.md](USAGE.md)**
+
+**Loading Modes:**
+- **LOW_BANDWIDTH** (default): Minimal download, slower startup
+- **FAST_FUSED**: Large download, faster startup
+
 ```bash
-bash download_classifier.sh
+# See all options
+python classify_text.py --help
 ```
-
-**Run:**
-
-The script supports two loading modes:
-
-1. **LOW_BANDWIDTH** (default) - Downloads only 40KB, merges adapters at runtime
-```bash
-python classify_text.py --checkpoint models/classifier_chat --mode LOW_BANDWIDTH
-```
-
-2. **FAST_FUSED** - Downloads 15.5GB pre-merged weights, faster startup
-```bash
-python classify_text.py --checkpoint models/classifier_chat --mode FAST_FUSED
-```
-
-Or provide text directly:
-```bash
-python classify_text.py --checkpoint models/classifier_chat --text "Your text here"
-```
-
-**Note:** FAST_FUSED mode requires downloading the full pre-merged model first. See `--help` for details.
 
 ## How It Works
 
