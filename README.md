@@ -42,14 +42,25 @@ bash download_classifier.sh
 ```
 
 **Run:**
+
+The script supports two loading modes:
+
+1. **LOW_BANDWIDTH** (default) - Downloads only 40KB, merges adapters at runtime
 ```bash
-python classify_text.py --checkpoint models/classifier_chat
+python classify_text.py --checkpoint models/classifier_chat --mode LOW_BANDWIDTH
+```
+
+2. **FAST_FUSED** - Downloads 15.5GB pre-merged weights, faster startup
+```bash
+python classify_text.py --checkpoint models/classifier_chat --mode FAST_FUSED
 ```
 
 Or provide text directly:
 ```bash
 python classify_text.py --checkpoint models/classifier_chat --text "Your text here"
 ```
+
+**Note:** FAST_FUSED mode requires downloading the full pre-merged model first. See `--help` for details.
 
 ## How It Works
 
