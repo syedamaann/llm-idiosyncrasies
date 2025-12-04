@@ -208,9 +208,34 @@ def predict_text(model, text, label_names):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Classify which LLM generated a piece of text (Chat APIs only)")
+    parser = argparse.ArgumentParser(
+        description="Classify which LLM generated a piece of text (Chat APIs only)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Loading Modes:
+  FAST_FUSED     - Load pre-merged weights (15.5GB download, faster startup)
+  LOW_BANDWIDTH  - Merge adapters at runtime (40KB download, slower startup)
+
+Examples:
+  # Fast mode (requires pre-downloaded merged weights)
+  python classify_text.py --checkpoint ./classifier_chat --mode FAST_FUSED
+
+  # Low bandwidth mode (minimal download)
+  python classify_text.py --checkpoint ./classifier_chat --mode LOW_BANDWIDTH
+
+  # With text directly
+  python classify_text.py --checkpoint ./classifier_chat --text "Your text here"
+        """
+    )
     parser.add_argument("--text", type=str, default=None, help="The text to classify (or will prompt for input)")
     parser.add_argument("--checkpoint", type=str, required=True, help="Path to the classifier checkpoint directory")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        default="LOW_BANDWIDTH",
+        choices=["FAST_FUSED", "LOW_BANDWIDTH"],
+        help="Loading mode: FAST_FUSED (fast, 15.5GB) or LOW_BANDWIDTH (slow, 40KB)"
+    )
 
     args = parser.parse_args()
 
@@ -235,8 +260,8 @@ def main():
         print("Error: No text provided")
         return
 
-    # Load model
-    model = load_classifier(args.checkpoint, num_labels)
+    # Load model with specified mode
+    model = load_classifier(args.checkpoint, mode=args.mode, num_labels=num_labels)
 
     # Predict
     print("\nAnalyzing text...")
