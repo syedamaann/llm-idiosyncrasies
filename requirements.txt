@@ -1,0 +1,9 @@
+transformers==4.46.3
+peft==0.13.2
+huggingface-hub
+accelerate
+llm2vec==0.2.3
+gradio
+plotly
+numpy
+torch
