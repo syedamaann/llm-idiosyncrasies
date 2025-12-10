@@ -1,7 +1,8 @@
-transformers>=4.56.2
+transformers==4.44.2
 peft==0.13.2
 huggingface-hub
 accelerate
+safetensors
 llm2vec==0.2.3
 gradio
 plotly
