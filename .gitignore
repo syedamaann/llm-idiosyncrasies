@@ -31,3 +31,5 @@ runs/
 # OS
 .DS_Store
 Thumbs.db
+
+notebooks/.gradio/
