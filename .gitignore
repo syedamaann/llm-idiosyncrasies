@@ -1,7 +1,6 @@
 # Model files
 models/
 notebooks/classifier_chat/
-notebooks/classifier_chat/
 
 # Python
 __pycache__/
