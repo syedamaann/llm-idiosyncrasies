@@ -49,7 +49,7 @@ source llm-detector/bin/activate  # On Windows: llm-detector\Scripts\activate
 
 ```bash
 # Install core dependencies with specific versions
-pip install transformers==4.46.3 peft==0.13.2 huggingface-hub accelerate
+pip install transformers>=4.56.2 peft==0.13.2 huggingface-hub accelerate
 
 # Install LLM2Vec
 pip install llm2vec==0.2.3
